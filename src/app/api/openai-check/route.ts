@@ -51,11 +51,11 @@ function performLocalGrammarCheck(content: string) {
     });
   });
 
-  // Check punctuation
+  // Enhanced punctuation checking
   sentences.forEach((sentence, index) => {
     const trimmed = sentence.trim();
 
-    // Missing periods
+    // 1. Missing periods at sentence ends
     if (index < sentences.length - 1 && trimmed.length > 0 && !/[.!?]$/.test(trimmed)) {
       punctuationIssues.push({
         text: trimmed,
@@ -66,7 +66,7 @@ function performLocalGrammarCheck(content: string) {
       });
     }
 
-    // Missing commas before conjunctions
+    // 2. Missing commas before conjunctions in compound sentences
     const conjunctionRegex = /\s+(and|but|or|so|yet)\s+/gi;
     const matches = [...trimmed.matchAll(conjunctionRegex)];
     matches.forEach(match => {
@@ -83,6 +83,76 @@ function performLocalGrammarCheck(content: string) {
         }
       }
     });
+
+    // 3. Question marks for questions
+    if (trimmed.toLowerCase().startsWith('what') || trimmed.toLowerCase().startsWith('how') ||
+        trimmed.toLowerCase().startsWith('why') || trimmed.toLowerCase().startsWith('when') ||
+        trimmed.toLowerCase().startsWith('where') || trimmed.toLowerCase().startsWith('who') ||
+        trimmed.toLowerCase().startsWith('which') || trimmed.toLowerCase().startsWith('do you') ||
+        trimmed.toLowerCase().startsWith('can you') || trimmed.toLowerCase().startsWith('will you')) {
+      if (!trimmed.endsWith('?')) {
+        punctuationIssues.push({
+          text: trimmed,
+          correction: trimmed.replace(/[.!]?$/, '?'),
+          position: content.indexOf(trimmed),
+          message: 'Question should end with question mark (?)',
+          category: 'punctuation'
+        });
+      }
+    }
+
+    // 4. Comma after introductory phrases
+    const introPatterns = [
+      /^(however|therefore|furthermore|moreover|nevertheless|consequently|meanwhile|finally|first|second|third|lastly),?\s+/i,
+      /^(in conclusion|in summary|for example|for instance|on the other hand|in addition|as a result),?\s+/i,
+      /^(after|before|when|while|since|because|although|though|if|unless)\s+\w+.*?,?\s+/i
+    ];
+
+    introPatterns.forEach(pattern => {
+      const match = trimmed.match(pattern);
+      if (match && !match[0].includes(',')) {
+        const introPhrase = match[0].trim();
+        punctuationIssues.push({
+          text: introPhrase,
+          correction: introPhrase + ',',
+          position: content.indexOf(trimmed),
+          message: 'Missing comma after introductory phrase',
+          category: 'punctuation'
+        });
+      }
+    });
+
+    // 5. Semicolon usage - check for run-on sentences that should use semicolons
+    if (trimmed.includes(' and ') || trimmed.includes(' but ') || trimmed.includes(' or ')) {
+      const parts = trimmed.split(/\s+(and|but|or)\s+/);
+      if (parts.length >= 3) {
+        const firstPart = parts[0];
+        const secondPart = parts[2];
+        if (firstPart.split(' ').length > 5 && secondPart.split(' ').length > 5) {
+          punctuationIssues.push({
+            text: trimmed,
+            correction: trimmed.replace(/\s+(and|but|or)\s+/, '; '),
+            position: content.indexOf(trimmed),
+            message: 'Consider using semicolon (;) to separate two independent clauses',
+            category: 'punctuation'
+          });
+        }
+      }
+    }
+
+    // 6. Colon usage - check for lists or explanations
+    if (trimmed.includes(' such as ') || trimmed.includes(' including ') ||
+        trimmed.includes(' for example ') || trimmed.includes(' namely ')) {
+      if (!trimmed.includes(':')) {
+        punctuationIssues.push({
+          text: trimmed,
+          correction: trimmed.replace(/(such as|including|for example|namely)/, ':'),
+          position: content.indexOf(trimmed),
+          message: 'Consider using colon (:) before list or explanation',
+          category: 'punctuation'
+        });
+      }
+    }
   });
 
   // Check capitalization
@@ -99,12 +169,18 @@ function performLocalGrammarCheck(content: string) {
     }
   });
 
-  // Check subject-verb agreement
+  // Enhanced verb position and agreement checking
+  const verbPositionIssues: any[] = [];
+
+  // 1. Subject-verb agreement patterns
   const agreementPatterns = [
     { pattern: /\b(he|she|it)\s+(are|were)\b/gi, message: 'Singular subject requires singular verb' },
-    { pattern: /\b(they|we)\s+(is|was)\b/gi, message: 'Plural subject requires plural verb' },
+    { pattern: /\b(they|we|you)\s+(is|was)\b/gi, message: 'Plural subject requires plural verb' },
     { pattern: /\bmany\s+\w+\s+is\b/gi, message: '"Many" requires plural verb "are"' },
-    { pattern: /\beach\s+\w+\s+are\b/gi, message: '"Each" requires singular verb "is"' }
+    { pattern: /\beach\s+\w+\s+are\b/gi, message: '"Each" requires singular verb "is"' },
+    { pattern: /\bevery\s+\w+\s+are\b/gi, message: '"Every" requires singular verb "is"' },
+    { pattern: /\bpeople\s+is\b/gi, message: '"People" is plural and requires "are"' },
+    { pattern: /\bchildren\s+is\b/gi, message: '"Children" is plural and requires "are"' }
   ];
 
   agreementPatterns.forEach(pattern => {
@@ -127,6 +203,114 @@ function performLocalGrammarCheck(content: string) {
       }
     });
   });
+
+  // 2. Verb position in questions (auxiliary verb placement)
+  const questionVerbPatterns = [
+    {
+      pattern: /\b(what|how|why|when|where|who|which)\s+(\w+)\s+(do|does|did|can|will|would|should|could)\b/gi,
+      message: 'In questions, auxiliary verb should come before the subject',
+      fix: (match: string) => {
+        const parts = match.split(/\s+/);
+        return `${parts[0]} ${parts[2]} ${parts[1]}`;
+      }
+    }
+  ];
+
+  questionVerbPatterns.forEach(pattern => {
+    const matches = [...content.matchAll(pattern.pattern)];
+    matches.forEach(match => {
+      if (match.index !== undefined) {
+        verbPositionIssues.push({
+          text: match[0],
+          correction: pattern.fix(match[0]),
+          position: match.index,
+          message: pattern.message,
+          category: 'verb_position'
+        });
+      }
+    });
+  });
+
+  // 3. Modal verb position errors
+  const modalPatterns = [
+    {
+      pattern: /\b(\w+)\s+(can|could|will|would|should|must|may|might)\s+(not)?\s*(\w+)/gi,
+      message: 'Modal verbs should come before the main verb',
+      check: (match: RegExpMatchArray) => {
+        const words = match[0].split(/\s+/);
+        const modals = ['can', 'could', 'will', 'would', 'should', 'must', 'may', 'might'];
+        const modalIndex = words.findIndex(word => modals.includes(word.toLowerCase()));
+        return modalIndex > 1; // Modal should be early in the phrase
+      }
+    }
+  ];
+
+  modalPatterns.forEach(pattern => {
+    const matches = [...content.matchAll(pattern.pattern)];
+    matches.forEach(match => {
+      if (match.index !== undefined && pattern.check(match)) {
+        verbPositionIssues.push({
+          text: match[0],
+          correction: match[0], // Would need more complex logic for correction
+          position: match.index,
+          message: pattern.message,
+          category: 'verb_position'
+        });
+      }
+    });
+  });
+
+  // 4. Verb tense consistency within sentences
+  sentences.forEach(sentence => {
+    const trimmed = sentence.trim();
+
+    // Check for mixed tenses in same sentence
+    const pastTenseVerbs = trimmed.match(/\b(was|were|had|did|went|came|saw|took|made|got)\b/gi) || [];
+    const presentTenseVerbs = trimmed.match(/\b(is|are|have|has|do|does|go|come|see|take|make|get)\b/gi) || [];
+    const futureMarkers = trimmed.match(/\b(will|shall|going to)\b/gi) || [];
+
+    if (pastTenseVerbs.length > 0 && presentTenseVerbs.length > 0) {
+      verbPositionIssues.push({
+        text: trimmed,
+        correction: trimmed, // Complex correction needed
+        position: content.indexOf(trimmed),
+        message: 'Mixed verb tenses in same sentence - maintain consistency',
+        category: 'verb_tense_consistency'
+      });
+    }
+  });
+
+  // 5. Infinitive errors (to + verb)
+  const infinitivePatterns = [
+    {
+      pattern: /\bto\s+(going|coming|running|walking|talking|working|playing|studying)\b/gi,
+      message: 'After "to", use base form of verb, not -ing form',
+      correction: (match: string) => match.replace(/ing\b/, '')
+    },
+    {
+      pattern: /\b(want|need|like|love|hate|prefer)\s+(\w+ing)\b/gi,
+      message: 'After verbs like "want", "need", use "to + infinitive"',
+      correction: (match: string) => match.replace(/(\w+)ing/, 'to $1')
+    }
+  ];
+
+  infinitivePatterns.forEach(pattern => {
+    const matches = [...content.matchAll(pattern.pattern)];
+    matches.forEach(match => {
+      if (match.index !== undefined) {
+        verbPositionIssues.push({
+          text: match[0],
+          correction: pattern.correction(match[0]),
+          position: match.index,
+          message: pattern.message,
+          category: 'infinitive_error'
+        });
+      }
+    });
+  });
+
+  // Add verb position issues to sentence structure issues
+  sentenceStructureIssues.push(...verbPositionIssues);
 
   const totalIssues = spellingIssues.length + punctuationIssues.length +
                      capitalizationIssues.length + sentenceStructureIssues.length +
@@ -283,14 +467,17 @@ CRITICAL EVALUATION INSTRUCTIONS:
 
 **GRAMMAR & MECHANICS - BE EXTREMELY THOROUGH:**
 
-**PUNCTUATION ERRORS TO FIND:**
-- Missing periods at end of sentences
-- Missing commas in compound sentences (before and, but, or, so)
-- Missing commas after introductory phrases
-- Missing apostrophes in contractions (don't, can't, it's)
-- Missing apostrophes in possessives (student's, students')
-- Incorrect comma usage in lists
-- Missing question marks and exclamation points
+**PUNCTUATION ERRORS TO FIND - CHECK EVERY SYMBOL:**
+- Missing periods (.) at end of sentences
+- Missing commas (,) in compound sentences (before and, but, or, so)
+- Missing commas (,) after introductory phrases (However, Therefore, In conclusion,)
+- Missing apostrophes (') in contractions (don't, can't, it's, won't)
+- Missing apostrophes (') in possessives (student's, students', children's)
+- Incorrect comma (,) usage in lists and series
+- Missing question marks (?) for questions (What, How, Why, When, Where, Who)
+- Wrong semicolon (;) usage - should separate independent clauses
+- Missing colons (:) before lists or explanations
+- Incorrect exclamation points (!) placement
 
 **SENTENCE FORMATION ERRORS TO FIND:**
 - Run-on sentences (two complete thoughts without proper punctuation)
@@ -300,12 +487,21 @@ CRITICAL EVALUATION INSTRUCTIONS:
 - Dangling modifiers
 
 **GRAMMATICAL MISTAKES TO FIND:**
-- Subject-verb agreement (singular subjects with plural verbs, etc.)
-- Incorrect verb tenses and tense inconsistency
+- Subject-verb agreement (he are → he is, they is → they are)
+- Incorrect verb tenses and tense inconsistency within sentences
 - Wrong article usage (a/an/the errors)
 - Pronoun errors (he/him, who/whom, etc.)
 - Wrong word forms (adjective vs adverb)
 - Preposition errors
+
+**VERB POSITION ERRORS TO FIND - CRITICAL:**
+- Wrong auxiliary verb placement in questions (What you do? → What do you do?)
+- Modal verb position errors (I tomorrow will go → I will go tomorrow)
+- Infinitive errors (I want going → I want to go)
+- Verb placement in negative sentences (I not like → I do not like)
+- Past participle position (I have yesterday gone → I went yesterday)
+- Continuous tense errors (I am go → I am going)
+- Perfect tense formation (I have went → I have gone)
 
 **SPELLING & CAPITALIZATION TO FIND:**
 - All misspelled words
@@ -388,7 +584,7 @@ BE EXTREMELY COMPREHENSIVE AND THOROUGH - Find ALL mistakes like a strict Englis
       }
       
       // Validate the response structure
-      if (!analysisResult.overallScore) {
+      if (analysisResult.overallScore === undefined || analysisResult.overallScore === null) {
         throw new Error('Invalid response structure');
       }
 
