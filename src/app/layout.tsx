@@ -9,7 +9,7 @@ const inter = Inter({
 
 export const metadata: Metadata = {
   title: "AI Essay Writer",
-  description: "AI-powered essay writing assistant with grammar checking and performance tracking",
+  description: "AI-powered essay writing assistant with intelligent grammar checking and Wordvice.ai integration",
 };
 
 export default function RootLayout({

@@ -1,11 +1,10 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Timer, Settings, TrendingUp, FileText, CheckCircle, AlertCircle, AlertTriangle, BookOpen } from 'lucide-react';
+import { Settings, TrendingUp, FileText, BookOpen } from 'lucide-react';
 import EssayEditor from '@/components/EssayEditor';
 import SettingsPanel from '@/components/SettingsPanel';
 import TopicFetcher from '@/components/TopicFetcher';
-import PerformanceDashboard from '@/components/PerformanceDashboard';
 import NewsReader from '@/components/NewsReader';
 
 export default function Home() {
@@ -27,7 +26,6 @@ export default function Home() {
   const [selectedTopic, setSelectedTopic] = useState(null);
   const [isTimerRunning, setIsTimerRunning] = useState(false);
   const [timeRemaining, setTimeRemaining] = useState(30 * 60);
-  const [submittedEssays, setSubmittedEssays] = useState([]);
   const [timerStoppedBySubmission, setTimerStoppedBySubmission] = useState(false);
 
   useEffect(() => {
@@ -71,38 +69,7 @@ export default function Home() {
     setActiveTab('write');
   };
 
-  const handleEssaySubmit = (submissionData) => {
-    // Stop the timer automatically when essay is submitted
-    setIsTimerRunning(false);
-    setTimerStoppedBySubmission(true);
 
-    // Add submission timestamp and timer info to the submission data
-    const enhancedSubmissionData = {
-      ...submissionData,
-      timerStoppedAt: new Date(),
-      finalTimeRemaining: timeRemaining,
-      totalTimeUsed: (settings.timeLimit * 60) - timeRemaining
-    };
-
-    setSubmittedEssays(prev => [...prev, enhancedSubmissionData]);
-    // Auto-switch to dashboard to show results
-    setActiveTab('dashboard');
-  };
-
-  const restartProgress = () => {
-    setSubmittedEssays([]);
-    setEssayData({
-      content: '',
-      wordCount: 0,
-      timeSpent: 0,
-      grammarIssues: [],
-    });
-    setSelectedTopic(null);
-    setIsTimerRunning(false);
-    setTimeRemaining(settings.timeLimit * 60);
-    setTimerStoppedBySubmission(false);
-    setActiveTab('write');
-  };
 
   const getHeaderContent = () => {
     switch (activeTab) {
@@ -127,13 +94,7 @@ export default function Home() {
           icon: '📰',
           gradient: 'from-orange-600 to-red-600'
         };
-      case 'dashboard':
-        return {
-          title: 'Performance Analytics',
-          subtitle: 'Track your writing progress and achievements',
-          icon: '📊',
-          gradient: 'from-purple-600 to-pink-600'
-        };
+
       case 'settings':
         return {
           title: 'Preferences',
@@ -144,7 +105,7 @@ export default function Home() {
       default:
         return {
           title: 'AI Essay Writer',
-          subtitle: 'Smart writing assistant with grammar checking and performance tracking',
+          subtitle: 'Smart writing assistant with AI-powered grammar checking',
           icon: '✍️',
           gradient: 'from-blue-600 to-purple-600'
         };
@@ -157,7 +118,6 @@ export default function Home() {
     { id: 'write', label: 'Write Essay', icon: FileText },
     { id: 'topics', label: 'Get Topics', icon: TrendingUp },
     { id: 'news', label: 'Read News', icon: BookOpen },
-    { id: 'dashboard', label: 'Performance', icon: CheckCircle },
     { id: 'settings', label: 'Settings', icon: Settings },
   ];
 
@@ -248,18 +208,11 @@ export default function Home() {
               setTimerStoppedBySubmission={setTimerStoppedBySubmission}
               formatTime={formatTime}
               selectedTopic={selectedTopic}
-              onEssaySubmit={handleEssaySubmit}
             />
           )}
           {activeTab === 'topics' && mounted && <TopicFetcher onTopicSelect={handleTopicSelect} />}
           {activeTab === 'news' && mounted && <NewsReader />}
-          {activeTab === 'dashboard' && mounted && (
-            <PerformanceDashboard
-              essayData={essayData}
-              submittedEssays={submittedEssays}
-              onRestartProgress={restartProgress}
-            />
-          )}
+
           {activeTab === 'settings' && mounted && (
             <SettingsPanel settings={settings} setSettings={setSettings} />
           )}
